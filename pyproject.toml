@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "tweeran"
+version = "0.1.0"
+description = ""
+authors = ["Andrea Marino <am.marinoandrea@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "tweeran"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+tweepy = "^4.12.1"
+
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^0.991"
+autopep8 = "^2.0.0"
+flake8 = "^6.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
