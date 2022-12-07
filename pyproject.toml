@@ -10,6 +10,8 @@ packages = [{include = "tweeran"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 tweepy = "^4.12.1"
+spacy = "^3.4.3"
+python-dotenv = "^0.21.0"
 
 
 [tool.poetry.group.dev.dependencies]
