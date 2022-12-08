@@ -11,7 +11,6 @@ MAX_NUMBER_SUBMISSIONS = 5000
 
 class RedditExtractionManager(ExtractionManager):
     client: praw.Reddit
-    output_path: os.PathLike | str
     subreddits: list[str]
 
     def __init__(
