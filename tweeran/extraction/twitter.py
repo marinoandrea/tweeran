@@ -1,18 +1,19 @@
 import io
 import os
 import time
-from abc import ABC, abstractmethod
 
 import spacy
 import tweepy
 
+from tweeran.extraction.base import ExtractionManager
+from tweeran.extraction.nlp import extract_tokens
+
 spacy_nlp = spacy.load('en_core_web_sm', disable=["parser", "entity"])
 
 
-class ExtractionManager(ABC):
+class TwitterExtractionManager(ExtractionManager):
     keywords: list[str]
     hashtags: list[str]
-    output_path: os.PathLike | str
 
     def __init__(
         self,
@@ -20,23 +21,12 @@ class ExtractionManager(ABC):
         keywords: list[str],
         hashtags: list[str]
     ) -> None:
-        self.output_path = output_path
+        super().__init__(output_path)
         self.keywords = keywords
         self.hashtags = hashtags
 
-    def __del__(self):
-        self.cleanup()
 
-    @abstractmethod
-    def cleanup(self) -> None:
-        ...
-
-    @abstractmethod
-    def run(self) -> None:
-        ...
-
-
-class StreamingExtractionManager(ExtractionManager):
+class TwitterStreamingExtractionManager(TwitterExtractionManager):
     client: tweepy.StreamingClient
     buffer: io.TextIOWrapper
 
@@ -62,7 +52,7 @@ class StreamingExtractionManager(ExtractionManager):
 
         rules.append(tweepy.StreamRule(terms))
         for tag in self.hashtags:
-            value = f"lang:en {tag} OR ({terms})"
+            value = f"lang:en {tag}"
             rule = tweepy.StreamRule(value)
             rules.append(rule)
 
@@ -77,16 +67,17 @@ class StreamingExtractionManager(ExtractionManager):
         self.client.on_tweet = self._on_tweet  # type: ignore
 
     def _on_tweet(self, t: tweepy.Tweet):
-        text = t.text.strip().replace("\n", " ").replace("\r", " ")
-        text_features = spacy_nlp(text)
-        tokens = [tok.text for tok in text_features if not tok.is_stop]
         out = "\t".join(map(str, [
             t.id,
             t.created_at,
             t.author_id,
             t.geo,
             t.context_annotations,
-            ",".join(tokens)
+            t.public_metrics["retweet_count"],
+            t.public_metrics["reply_count"],
+            t.public_metrics["like_count"],
+            t.public_metrics["quote_count"],
+            ",".join(extract_tokens(t.text))
         ]))
         self.buffer.write(f"{out}\n")
 
@@ -96,7 +87,7 @@ class StreamingExtractionManager(ExtractionManager):
             time.sleep(1)
 
 
-class SearchExtractionManager(ExtractionManager):
+class TwitterSearchExtractionManager(TwitterExtractionManager):
     client: tweepy.Client
 
     def __init__(
