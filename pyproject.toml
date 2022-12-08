@@ -12,6 +12,8 @@ python = "^3.10"
 tweepy = "^4.12.1"
 spacy = "^3.4.3"
 python-dotenv = "^0.21.0"
+praw = "^7.6.1"
+pandas = "^1.5.2"
 
 
 [tool.poetry.group.dev.dependencies]
