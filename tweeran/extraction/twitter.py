@@ -5,15 +5,15 @@ import time
 import spacy
 import tweepy
 
-from tweeran.extraction.base import ExtractionManager
-from tweeran.extraction.nlp import extract_tokens
+from tweeran.nlp import extract_tokens
 
 spacy_nlp = spacy.load('en_core_web_sm', disable=["parser", "entity"])
 
 
-class TwitterExtractionManager(ExtractionManager):
+class TwitterExtractionManager:
     keywords: list[str]
     hashtags: list[str]
+    output_path: os.PathLike | str
 
     def __init__(
         self,
@@ -21,7 +21,7 @@ class TwitterExtractionManager(ExtractionManager):
         keywords: list[str],
         hashtags: list[str]
     ) -> None:
-        super().__init__(output_path)
+        self.output_path = output_path
         self.keywords = keywords
         self.hashtags = hashtags
 

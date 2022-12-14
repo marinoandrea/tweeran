@@ -1,51 +1,63 @@
-import io
-import os
+from dataclasses import dataclass
 
+import pandas as pd
 import praw
 
-from tweeran.extraction.base import ExtractionManager
-from tweeran.extraction.nlp import extract_tokens
+from tweeran.nlp import clean, is_text_relevant
 
-MAX_NUMBER_SUBMISSIONS = 5000
+MAX_ENTRIES_DEFAULT = 10000
+
+FEATURES_SUBMISSION = ["id", "created_utc", "author", "ups", "downs",
+                       "view_count", "score", "subreddit", "num_comments",
+                       "title", "selftext"]
+FEATURES_COMMENT = ["id", "created_utc", "author", "body", "score"]
 
 
-class RedditExtractionManager(ExtractionManager):
+@dataclass
+class RedditExtractionResult:
+    submissions: pd.DataFrame
+    comments: pd.DataFrame
+
+
+class RedditExtractionManager:
     client: praw.Reddit
     subreddits: list[str]
+    event_wikidata_id: str
+    max_entries: int
 
     def __init__(
         self,
         client: praw.Reddit,
-        output_path: os.PathLike | str,
-        subreddits: list[str]
-    ) -> None:
-        super().__init__(output_path)
+        subreddits: list[str],
+        event_wikidata_id: str,
+        max_entries: int = MAX_ENTRIES_DEFAULT
+    ):
         self.client = client
         self.subreddits = subreddits
-        self.buffer = open(
-            output_path, mode="w+", buffering=io.DEFAULT_BUFFER_SIZE)
+        self.event_wikidata_id = event_wikidata_id
+        self.max_entries = max_entries
 
-    def cleanup(self) -> None:
-        self.buffer.close()
+    def run(self) -> RedditExtractionResult:
+        comments = []
+        submissions = []
+        submissions_ids = set()
 
-    def run(self) -> None:
         for subreddit_name in self.subreddits:
             subreddit = self.client.subreddit(subreddit_name)
-            for p in subreddit.top(limit=MAX_NUMBER_SUBMISSIONS):
-                self._write_post(p)
+            for s in subreddit.top(limit=self.max_entries):
+                if (
+                    not is_text_relevant(self.event_wikidata_id, s.title) and
+                    not is_text_relevant(self.event_wikidata_id, s.selftext)
+                ):
+                    continue
+                submissions.append({f: clean(getattr(s, f)) for f in FEATURES_SUBMISSION})
+                submissions_ids.add(s.id)
 
-    def _write_post(self, p: praw.reddit.models.Submission):
-        out = "\t".join(map(str, [
-            p.id,
-            p.created_utc,
-            p.author,
-            p.ups,
-            p.downs,
-            p.view_count,
-            p.score,
-            p.subreddit,
-            p.num_comments,
-            ",".join(extract_tokens(p.title)),
-            ",".join(extract_tokens(p.selftext)),
-        ]))
-        self.buffer.write(f"{out}\n")
+            for c in subreddit.comments(limit=self.max_entries):
+                if c.submission.id not in submissions_ids:
+                    continue
+                comments.append({f: clean(getattr(c, f)) for f in FEATURES_COMMENT})
+
+        return RedditExtractionResult(
+            submissions=pd.DataFrame(submissions, columns=FEATURES_SUBMISSION),
+            comments=pd.DataFrame(comments, columns=FEATURES_COMMENT))
