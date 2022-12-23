@@ -45,38 +45,45 @@ def get_wikipedia_article(title: str) -> str:
 
 
 @lru_cache
-def get_related_entities(wikidata_id: str) -> set[str]:
-    wikidata_entity = get_wikidata_entity(wikidata_id)
+def get_related_entities(wikidata_ids: list[str]) -> set[str]:
+    related_entities: set[str] = set()
 
-    label_features = spacy_nlp(wikidata_entity["labels"]["en"]["value"])
-    desc_features = spacy_nlp(wikidata_entity["descriptions"]["en"]["value"])
-    aliases_features = []
-    for alias in wikidata_entity["aliases"].get("en", []):
-        aliases_features.append(spacy_nlp(alias["value"]))
+    for wid in wikidata_ids:
+        wikidata_entity = get_wikidata_entity(wid)
 
-    related_entities = []
-    for ent in label_features.ents:
-        related_entities.append(ent)
-    for ent in desc_features.ents:
-        related_entities.append(ent)
-    for alias_feat in aliases_features:
-        for ent in alias_feat.ents:
-            related_entities.append(ent)
+        label_features = spacy_nlp(wikidata_entity["labels"]["en"]["value"])
+        desc_features = spacy_nlp(
+            wikidata_entity["descriptions"]["en"]["value"])
+        aliases_features = []
+        for alias in wikidata_entity["aliases"].get("en", []):
+            aliases_features.append(spacy_nlp(alias["value"]))
 
-    wikipedia_article = get_wikipedia_article(
-        wikidata_entity["sitelinks"]["enwiki"]["title"])
+        ents = []
+        for ent in label_features.ents:
+            ents.append(ent)
+        for ent in desc_features.ents:
+            ents.append(ent)
+        for alias_feat in aliases_features:
+            for ent in alias_feat.ents:
+                ents.append(ent)
 
-    wikipedia_article_features = spacy_nlp(wikipedia_article)
-    for ent in wikipedia_article_features.ents:
-        related_entities.append(ent)
+        wikipedia_article = get_wikipedia_article(
+            wikidata_entity["sitelinks"]["enwiki"]["title"])
 
-    # remove irrelevant entities
-    related_entities = list(filter(
-        lambda x: x.label_ not in {
-            'CARDINAL', 'ORDINAL', 'PERCENT', 'QUANTITY'},
-        related_entities))
+        wikipedia_article_features = spacy_nlp(wikipedia_article)
+        for ent in wikipedia_article_features.ents:
+            ents.append(ent)
 
-    return set(list(map(lambda x: x.text.lower(), related_entities)))
+        # remove irrelevant entities
+        final_ents = list(filter(
+            lambda x: x.label_ not in {
+                'CARDINAL', 'ORDINAL', 'PERCENT', 'QUANTITY'},
+            ents))
+
+        related_entities.update(
+            set(map(lambda x: x.text.lower(), final_ents)))
+
+    return related_entities
 
 
 def is_text_relevant(event_wikidata_id: str, text: str) -> bool:
