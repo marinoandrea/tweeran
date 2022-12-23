@@ -11,7 +11,7 @@ spacy_nlp = spacy.load('en_core_web_sm')
 def extract_tokens(text: str) -> list[str]:
     text = text.strip().replace("\n", " ").replace("\r", " ")
     text_features = spacy_nlp(text)
-    return [tok.text for tok in text_features if not tok.is_stop]
+    return [tok.text for tok in text_features if not tok.is_stop and not tok.is_punct]
 
 
 def clean(value: Any) -> Any:
@@ -71,10 +71,10 @@ def get_related_entities(wikidata_id: str) -> set[str]:
         related_entities.append(ent)
 
     # remove irrelevant entities
-    related_entities = filter(
+    related_entities = list(filter(
         lambda x: x.label_ not in {
             'CARDINAL', 'ORDINAL', 'PERCENT', 'QUANTITY'},
-        related_entities)
+        related_entities))
 
     return set(list(map(lambda x: x.text.lower(), related_entities)))
 
@@ -83,3 +83,16 @@ def is_text_relevant(event_wikidata_id: str, text: str) -> bool:
     related_entities = get_related_entities(event_wikidata_id)
     text_features = spacy_nlp(text)
     return any(e.text.lower() in related_entities for e in text_features.ents)
+
+
+def get_bigrams(text: str):
+    bigrams = []
+    tokens = extract_tokens(text)
+    for i in range(len(tokens) - 1):
+        w1 = tokens[i].lower()
+        w2 = tokens[i + 1].lower()
+        if len(w1) < 2 or len(w2) < 2:
+            continue
+        vec = spacy_nlp(f"{w1} {w2}").vector
+        bigrams.append((f"{w1}_{w2}", vec))
+    return bigrams
